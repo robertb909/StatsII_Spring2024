@@ -1,0 +1,139 @@
+---
+title: "Problem Set 1"
+author: "Robert Baker"
+date: "2024-02-11"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#####################
+# load libraries
+# set wd
+# clear global .envir
+#####################
+
+# remove objects
+rm(list=ls())
+# detach all libraries
+detachAllPackages <- function() {
+  basic.packages <- c("package:stats", "package:graphics", "package:grDevices", "package:utils", "package:datasets", "package:methods", "package:base")
+  package.list <- search()[ifelse(unlist(gregexpr("package:", search()))==1, TRUE, FALSE)]
+  package.list <- setdiff(package.list, basic.packages)
+  if (length(package.list)>0)  for (package in package.list) detach(package,  character.only=TRUE)
+}
+detachAllPackages()
+
+# load libraries
+pkgTest <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages()[,  "Package"])]
+  if (length(new.pkg)) 
+    install.packages(new.pkg,  dependencies = TRUE)
+  sapply(pkg,  require,  character.only = TRUE)
+}
+
+# here is where you load any necessary packages
+# ex: stringr
+# lapply(c("stringr"),  pkgTest)
+
+lapply(c(),  pkgTest)
+
+# set wd for current folder
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+```
+
+
+# Question 1
+
+First, we will set the seed for reproducibility and create the data using the rcauchy function.
+We will then calculate our test statistic and our p-value.
+Finally we can check these results vs. the in-built R function ks.test().
+
+
+```{r}
+# Setting seed
+set.seed(909)
+
+# Generating 1,000 Cauchy Random Variables
+n <- 1000
+empirical <- rcauchy(n, location = 0, scale = 1)
+
+# Creating a K-S function  
+ksTest <- function (data){
+  # Creating an empirical distribution of observed data
+  ECDF <- ecdf(data)
+  empiricalCDF <- ECDF(data)
+  
+  # Generating test statistic
+  D <- max(abs(empiricalCDF - pnorm(data)))
+  
+  # Calculating P-value
+  # Firstly, creating an empty vector 
+  summed <- NULL
+  for(i in 1:n){
+    summed <- c(summed, exp((-(2 * i - 1)^2 * pi^2) / ((8 * D)^2)))
+  }
+  pValue <- sqrt(2*pi)/D * sum(summed) 
+  cat("D =", round(D,2), "\n")
+  cat("p-value =", round(pValue,2), "\n")
+}
+# K-S Test
+ksTest(empirical)
+
+# Checking Test Results
+ks.test(empirical, "pnorm")
+
+
+```
+We can note the results are very similar and we can assume the slight differences are down to rounding or approximation. 
+
+# Question 2 
+
+
+We will firstly set the seed for reproducibility and generate the data.
+We can then write and execute a log-likelihood function. 
+We will estimate the coefficients using the MLE technique.
+Following this we will check our output versus the OLS method using the R in-built lm() function.
+
+```{r}
+
+# Setting Seed 
+set.seed(909)
+
+# Generating Data
+data <- data.frame(x = runif(200, 1, 10))
+data$y <- 0 + 2.75 * data$x + rnorm(200, 0, 1.5) 
+
+# Defining a Log-likelihood Function
+norm_log_likelihood <- function(outcome, input, parameter) {
+  n <- ncol(input) # Number of coefficients to estimate
+  beta <- parameter[1:n] # Extracting coefficients
+  sigma <- sqrt(parameter[1 + n]) # Estimating variance
+  # Calculating log-likelihood 
+  -sum(dnorm(outcome, input %*% beta, sigma, log = TRUE))
+}
+
+# Estimating Coefficients using MLE
+norm_results <- optim(
+  fn = norm_log_likelihood, 
+  outcome = data$y, 
+  input = cbind(1, data$x), 
+  par = c(1, 1, 1), 
+  hessian = TRUE
+)
+
+# Displaying Estimated Coefficients 
+round(norm_results$par, 2)[1:2]
+
+# Comparing Results with OLS - using lm()
+round(coef(lm(y ~ x, data = data)), 2)
+
+```
+
+
+
+
